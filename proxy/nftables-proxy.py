@@ -36,6 +36,7 @@ from pathlib import Path
 DEFAULT_SOCKET_PATH = "/run/nftables-proxy/proxy.sock"
 DEFAULT_SOCKET_GROUP = "docker"
 DEFAULT_LISTEN_PORT = 25565
+VOICE_PORT = 24454  # Simple Voice Chat UDP port
 TABLE_NAME = "minecraft_proxy"
 CHAIN_PREROUTING = "prerouting"
 CHAIN_POSTROUTING = "postrouting"
@@ -102,6 +103,7 @@ table ip {TABLE_NAME} {{
     chain {CHAIN_PREROUTING} {{
         type nat hook prerouting priority dstnat; policy accept;
         tcp dport {listen_port} reject with tcp reset
+        udp dport {VOICE_PORT} drop
     }}
 
     chain {CHAIN_POSTROUTING} {{
@@ -122,13 +124,14 @@ table ip {TABLE_NAME} {{
 
 
 def set_destination(ip: str, port: int, listen_port: int) -> None:
-    """Set the DNAT destination."""
+    """Set the DNAT destination for game traffic (TCP) and voice chat (UDP)."""
     logging.info(f"Setting destination to {ip}:{port}")
 
-    # Replace the prerouting chain with the new rule
+    # Replace the prerouting chain with the new rules
     nft_script = f"""
 flush chain ip {TABLE_NAME} {CHAIN_PREROUTING}
 add rule ip {TABLE_NAME} {CHAIN_PREROUTING} tcp dport {listen_port} dnat to {ip}:{port}
+add rule ip {TABLE_NAME} {CHAIN_PREROUTING} udp dport {VOICE_PORT} dnat to {ip}:{VOICE_PORT}
 """
     proc = subprocess.run(
         ["nft", "-f", "-"],
@@ -148,6 +151,7 @@ def clear_destination(listen_port: int) -> None:
     nft_script = f"""
 flush chain ip {TABLE_NAME} {CHAIN_PREROUTING}
 add rule ip {TABLE_NAME} {CHAIN_PREROUTING} tcp dport {listen_port} reject with tcp reset
+add rule ip {TABLE_NAME} {CHAIN_PREROUTING} udp dport {VOICE_PORT} drop
 """
     proc = subprocess.run(
         ["nft", "-f", "-"],
