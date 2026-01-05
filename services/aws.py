@@ -148,7 +148,7 @@ class EC2Service:
             await asyncio.to_thread(
                 waiter.wait,
                 InstanceIds=[server.instance_id],
-                WaiterConfig={"Delay": 15, "MaxAttempts": EC2_START_TIMEOUT_SEC // 15},
+                WaiterConfig={"Delay": 5, "MaxAttempts": EC2_START_TIMEOUT_SEC // 5},
             )
             logging.info(f"Instance {server.instance_id} is now running")
 

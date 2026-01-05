@@ -15,9 +15,9 @@ MC_READY_TIMEOUT_SEC = 180        # Max wait for Minecraft to respond after EC2 
 MC_STATUS_TIMEOUT_SEC = 5         # Timeout for single MC status check
 
 # ----- Polling -----
-MC_POLL_INITIAL_DELAY_SEC = 2     # Initial delay between MC status polls
-MC_POLL_MAX_DELAY_SEC = 15        # Max delay between polls (exponential backoff cap)
-MC_POLL_BACKOFF_FACTOR = 1.5      # Multiplier for exponential backoff
+MC_POLL_FAST_INTERVAL_SEC = 3     # Interval during fast polling phase
+MC_POLL_FAST_DURATION_SEC = 60    # How long to fast-poll before slowing down
+MC_POLL_SLOW_INTERVAL_SEC = 10    # Interval during slow polling phase
 
 # ----- Auto-stop -----
 MONITOR_INTERVAL_MIN = 5          # How often to check for empty servers

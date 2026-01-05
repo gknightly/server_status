@@ -13,9 +13,9 @@ from mcstatus import JavaServer
 from constants import (
     MC_STATUS_TIMEOUT_SEC,
     MC_READY_TIMEOUT_SEC,
-    MC_POLL_INITIAL_DELAY_SEC,
-    MC_POLL_MAX_DELAY_SEC,
-    MC_POLL_BACKOFF_FACTOR,
+    MC_POLL_FAST_INTERVAL_SEC,
+    MC_POLL_FAST_DURATION_SEC,
+    MC_POLL_SLOW_INTERVAL_SEC,
 )
 
 
@@ -104,7 +104,10 @@ class MinecraftService:
         progress_callback: Callable[[int, int], Awaitable[None]] | None = None,
     ) -> MCStatus | None:
         """
-        Wait for a Minecraft server to become ready using exponential backoff.
+        Wait for a Minecraft server to become ready using two-phase polling.
+
+        Fast phase: Poll frequently for the first MC_POLL_FAST_DURATION_SEC seconds.
+        Slow phase: Poll less frequently after that until timeout.
 
         Args:
             ip: Server IP or hostname
@@ -115,7 +118,6 @@ class MinecraftService:
             MCStatus if server responds, None on timeout
         """
         elapsed = 0.0
-        delay = float(MC_POLL_INITIAL_DELAY_SEC)
         attempt = 0
 
         logging.info(f"Waiting for Minecraft server at {ip} (timeout: {timeout}s)")
@@ -137,15 +139,17 @@ class MinecraftService:
                 except Exception as e:
                     logging.warning(f"Progress callback error: {type(e).__name__}: {e}")
 
-            # Wait with exponential backoff
+            # Two-phase polling: fast for first N seconds, then slow
+            if elapsed < MC_POLL_FAST_DURATION_SEC:
+                delay = MC_POLL_FAST_INTERVAL_SEC
+            else:
+                delay = MC_POLL_SLOW_INTERVAL_SEC
+
             await asyncio.sleep(delay)
             elapsed += delay
 
-            # Increase delay for next iteration (capped at max)
-            delay = min(delay * MC_POLL_BACKOFF_FACTOR, float(MC_POLL_MAX_DELAY_SEC))
-
             logging.debug(
-                f"MC poll attempt {attempt} for {ip}, elapsed {elapsed:.0f}s, next delay {delay:.1f}s"
+                f"MC poll attempt {attempt} for {ip}, elapsed {elapsed:.0f}s, interval {delay}s"
             )
 
         logging.warning(
