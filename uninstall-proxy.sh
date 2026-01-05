@@ -55,6 +55,14 @@ rm -rf /opt/nftables-proxy
 info "Cleaning up nftables rules..."
 nft delete table ip minecraft_proxy 2>/dev/null || true
 
+# Restore DOCKER-USER chain to default (just a return rule)
+info "Restoring DOCKER-USER chain to default..."
+if nft list chain ip filter DOCKER-USER &>/dev/null; then
+    nft flush chain ip filter DOCKER-USER
+    nft add rule ip filter DOCKER-USER counter return
+    info "DOCKER-USER chain restored"
+fi
+
 # Remove socket directory if it exists
 rm -rf /run/nftables-proxy
 

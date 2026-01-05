@@ -27,9 +27,9 @@ AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
 
 # RuntimeDirectory creates /run/nftables-proxy/ with correct permissions
 # The service creates the socket inside this directory
+# Mode 0755 allows traversal so docker group can reach the socket inside
 RuntimeDirectory=nftables-proxy
-RuntimeDirectoryMode=0750
-RuntimeDirectoryPreserve=restart
+RuntimeDirectoryMode=0755
 
 # Logging
 StandardOutput=journal

@@ -111,6 +111,27 @@ else
     warn "Socket not found at $SOCKET_PATH. Check: journalctl -u nftables-proxy"
 fi
 
+# Configure DOCKER-USER chain for forwarding (required when Docker is present)
+# Docker's FORWARD chain has policy DROP, so we need explicit rules to allow
+# proxied traffic through.
+info "Configuring firewall rules for traffic forwarding..."
+if nft list chain ip filter DOCKER-USER &>/dev/null; then
+    info "Configuring DOCKER-USER chain for proxy forwarding..."
+    nft flush chain ip filter DOCKER-USER
+    # Accept return traffic for established connections (required for responses from backend)
+    nft add rule ip filter DOCKER-USER ct state established,related counter accept
+    # Accept new Minecraft connections being forwarded to backend
+    nft add rule ip filter DOCKER-USER tcp dport 25565 counter accept
+    # Accept voice chat traffic (Simple Voice Chat mod)
+    nft add rule ip filter DOCKER-USER udp dport 24454 counter accept
+    # Return for everything else (continues through Docker's FORWARD chain)
+    nft add rule ip filter DOCKER-USER counter return
+    info "DOCKER-USER chain configured"
+else
+    warn "DOCKER-USER chain not found (Docker may not be running)."
+    warn "Run this script again after starting Docker, or manually configure forwarding."
+fi
+
 # Print summary
 echo ""
 echo -e "${GREEN}========================================${NC}"
