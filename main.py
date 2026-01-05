@@ -1,6 +1,7 @@
 # main.py
 """Entry point for the Minecraft server Discord bot."""
 import logging
+import subprocess
 import sys
 
 from bot import MinecraftServerBot
@@ -23,6 +24,23 @@ def setup_logging() -> None:
         logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
+def check_nftables_service() -> bool:
+    """Check if the nftables-proxy service is installed and active.
+
+    Returns True if the service is active, False otherwise.
+    """
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", "nftables-proxy"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
 if __name__ == "__main__":
     setup_logging()
 
@@ -39,6 +57,14 @@ if __name__ == "__main__":
         sys.exit(1)
     except Exception as e:
         logging.exception("Unexpected error loading configuration.")
+        sys.exit(1)
+
+    # Check nftables service if proxy mode is enabled
+    if config.proxy_mode and not check_nftables_service():
+        logging.error(
+            "Proxy mode is enabled but the nftables-proxy service is not active. "
+            "Please start the service with: sudo systemctl start nftables-proxy"
+        )
         sys.exit(1)
 
     # Create and run the bot instance

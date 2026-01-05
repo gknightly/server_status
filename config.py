@@ -75,6 +75,7 @@ class BotCfg:
     aws_secret: str
     servers: dict[str, ServerCfg]
     single_server_mode: bool = False
+    proxy_mode: bool = False
 
     @staticmethod
     def load(path: Path = CONFIG_PATH) -> BotCfg:
@@ -88,6 +89,7 @@ class BotCfg:
                         "AWS_ACCESS_KEY": "xxxxxxxxxxxx",
                         "AWS_SECRET": "xxxxxxxxxxxxxxxxxxxxxxxx",
                         "SINGLE_SERVER_MODE": False,
+                        "PROXY_MODE": False,
                         "servers": {
                             "default": {
                                 "INSTANCE_ID": "i-xxxxxxxxxxxx",
@@ -145,8 +147,9 @@ class BotCfg:
 
             # Optional settings
             single_server_mode = raw.get("SINGLE_SERVER_MODE", False)
+            proxy_mode = raw.get("PROXY_MODE", False)
 
-            return BotCfg(token, aws_key, aws_secret, servers, single_server_mode)
+            return BotCfg(token, aws_key, aws_secret, servers, single_server_mode, proxy_mode)
 
         except ConfigError:
             raise

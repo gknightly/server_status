@@ -5,3 +5,6 @@ services:
     restart: unless-stopped
     volumes:
       - .:/app
+      # Mount the nftables-proxy socket for proxy mode
+      # Only needed if PROXY_MODE is enabled in config.json
+      - /var/run/nftables-proxy.sock:/var/run/nftables-proxy.sock

@@ -1,0 +1,40 @@
+[Unit]
+Description=nftables Proxy Service for Minecraft Server Routing
+After=network.target nftables.service
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/nftables-proxy/nftables-proxy.py
+Restart=on-failure
+RestartSec=5
+
+# Security hardening (while still allowing nftables management)
+NoNewPrivileges=no
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=no
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+# Required capabilities for nftables and socket
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+
+# RuntimeDirectory creates /run/nftables-proxy/ with correct permissions
+# The service creates the socket inside this directory
+RuntimeDirectory=nftables-proxy
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=restart
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nftables-proxy
+
+[Install]
+WantedBy=multi-user.target

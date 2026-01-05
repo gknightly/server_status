@@ -18,9 +18,9 @@ from constants import (
     GRACE_PERIOD_MIN,
     STOP_TIMEOUT_SEC,
 )
-from errors import AWSError
+from errors import AWSError, ProxyError
 from models import ServerMonitor
-from services import EC2Service, MinecraftService
+from services import EC2Service, MinecraftService, NFTablesClient
 
 
 class MinecraftServerBot:
@@ -30,6 +30,12 @@ class MinecraftServerBot:
         self.cfg = cfg
         self.ec2 = EC2Service(cfg.aws_key, cfg.aws_secret)
         self.monitor = ServerMonitor.from_config(cfg.servers)
+
+        # Initialize proxy client if proxy mode is enabled
+        self.proxy: NFTablesClient | None = None
+        if cfg.proxy_mode:
+            self.proxy = NFTablesClient()
+            logging.info("Proxy mode enabled")
 
         # Setup Discord client intents
         intents = discord.Intents.default()
@@ -102,6 +108,77 @@ class MinecraftServerBot:
             except AWSError:
                 pass  # Skip servers we can't check
         return running
+
+    async def _update_proxy(
+        self,
+        server: ServerCfg,
+        channel: discord.abc.Messageable | None,
+    ) -> bool:
+        """Update the proxy to route traffic to the server's EC2 instance.
+
+        Returns True if successful, False otherwise.
+        """
+        if not self.proxy:
+            return True  # Proxy not enabled, nothing to do
+
+        try:
+            public_ip = await self.ec2.get_public_ip(server)
+            if not public_ip:
+                logging.warning(f"No public IP for {server.name}, cannot update proxy")
+                if channel:
+                    await self.say(
+                        channel,
+                        embed=self.embed(
+                            f"Warning: Could not get public IP for `{server.name}`. "
+                            "Proxy not updated.",
+                            discord.Color.orange(),
+                        ),
+                    )
+                return False
+
+            await self.proxy.set_destination(public_ip)
+            logging.info(f"Proxy updated to route to {public_ip} for {server.name}")
+            return True
+
+        except ProxyError as e:
+            logging.error(f"Failed to update proxy for {server.name}: {e}")
+            if channel:
+                await self.say(
+                    channel,
+                    embed=self.embed(
+                        f"Warning: Failed to update proxy routing: {e}",
+                        discord.Color.orange(),
+                    ),
+                )
+            return False
+
+    async def _clear_proxy(
+        self,
+        channel: discord.abc.Messageable | None,
+    ) -> bool:
+        """Clear the proxy routing (reject incoming connections).
+
+        Returns True if successful, False otherwise.
+        """
+        if not self.proxy:
+            return True  # Proxy not enabled, nothing to do
+
+        try:
+            await self.proxy.clear_destination()
+            logging.info("Proxy routing cleared")
+            return True
+
+        except ProxyError as e:
+            logging.error(f"Failed to clear proxy: {e}")
+            if channel:
+                await self.say(
+                    channel,
+                    embed=self.embed(
+                        f"Warning: Failed to clear proxy routing: {e}",
+                        discord.Color.orange(),
+                    ),
+                )
+            return False
 
     # -- embeds ---------------------------------------------------------------
     @staticmethod
@@ -332,6 +409,9 @@ class MinecraftServerBot:
             )
             return
 
+        # Update proxy routing to point to this server
+        await self._update_proxy(server, channel)
+
         # Wait for health checks
         await self.say(
             channel,
@@ -476,6 +556,9 @@ class MinecraftServerBot:
                 )
                 await self.ec2.stop_instance(server, force=True)
 
+            # Clear proxy routing since server is stopped
+            await self._clear_proxy(channel)
+
             await self.say(
                 channel,
                 embed=self.embed(f"Server `{server_name}` stopped!", discord.Color.red()),
@@ -574,6 +657,10 @@ class MinecraftServerBot:
 
         try:
             await self.ec2.stop_instance(server, force=True)
+
+            # Clear proxy routing since server is stopped
+            await self._clear_proxy(channel)
+
             await self.say(
                 channel,
                 embed=self.embed(

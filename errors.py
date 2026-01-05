@@ -20,3 +20,8 @@ class MinecraftError(BotError):
 class ConfigError(BotError):
     """Configuration invalid."""
     pass
+
+
+class ProxyError(BotError):
+    """Proxy operation failed."""
+    pass

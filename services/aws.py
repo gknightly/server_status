@@ -72,6 +72,23 @@ class EC2Service:
             logging.error(f"Unexpected response format for {server.instance_id}: {e}")
             raise AWSError(f"Invalid AWS response: {e}") from e
 
+    async def get_public_ip(self, server: ServerCfg) -> str | None:
+        """Get the public IP address of a running EC2 instance."""
+        try:
+            client = self._get_client(server.region)
+            response = await asyncio.to_thread(
+                client.describe_instances,
+                InstanceIds=[server.instance_id],
+            )
+            instance = response["Reservations"][0]["Instances"][0]
+            return instance.get("PublicIpAddress")
+        except ClientError as e:
+            logging.error(f"AWS error getting public IP for {server.instance_id}: {e}")
+            raise AWSError(f"Failed to get public IP: {e}") from e
+        except (KeyError, IndexError) as e:
+            logging.error(f"Unexpected response format for {server.instance_id}: {e}")
+            raise AWSError(f"Invalid AWS response: {e}") from e
+
     async def get_health(self, server: ServerCfg) -> InstanceHealth:
         """Get detailed health status of an EC2 instance."""
         try:
