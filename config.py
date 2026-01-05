@@ -149,6 +149,13 @@ class BotCfg:
             single_server_mode = raw.get("SINGLE_SERVER_MODE", False)
             proxy_mode = raw.get("PROXY_MODE", False)
 
+            # Validate mode compatibility
+            if proxy_mode and not single_server_mode:
+                raise ConfigError(
+                    "PROXY_MODE requires SINGLE_SERVER_MODE to be enabled. "
+                    "The proxy can only route to one server at a time."
+                )
+
             return BotCfg(token, aws_key, aws_secret, servers, single_server_mode, proxy_mode)
 
         except ConfigError:
