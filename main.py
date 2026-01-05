@@ -1,13 +1,14 @@
 # main.py
 """Entry point for the Minecraft server Discord bot."""
 import logging
-import subprocess
 import sys
+from pathlib import Path
 
 from bot import MinecraftServerBot
 from config import BotCfg
 from constants import VERBOSE
 from errors import ConfigError
+from services.nftables import DEFAULT_SOCKET_PATH
 
 
 def setup_logging() -> None:
@@ -25,20 +26,11 @@ def setup_logging() -> None:
 
 
 def check_nftables_service() -> bool:
-    """Check if the nftables-proxy service is installed and active.
+    """Check if the nftables-proxy socket is available.
 
-    Returns True if the service is active, False otherwise.
+    Returns True if the socket exists, False otherwise.
     """
-    try:
-        result = subprocess.run(
-            ["systemctl", "is-active", "nftables-proxy"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return False
+    return Path(DEFAULT_SOCKET_PATH).exists()
 
 
 if __name__ == "__main__":
@@ -62,8 +54,8 @@ if __name__ == "__main__":
     # Check nftables service if proxy mode is enabled
     if config.proxy_mode and not check_nftables_service():
         logging.error(
-            "Proxy mode is enabled but the nftables-proxy service is not active. "
-            "Please start the service with: sudo systemctl start nftables-proxy"
+            f"Proxy mode is enabled but the nftables-proxy socket was not found at {DEFAULT_SOCKET_PATH}. "
+            "Please ensure the service is running and the socket is mounted into the container."
         )
         sys.exit(1)
 
