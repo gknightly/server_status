@@ -448,14 +448,21 @@ class MinecraftServerBot:
                 embed=await self.status_embed(server),
             )
         else:
-            await self.say(
-                channel,
-                embed=self.embed(
-                    f"Server `{server_name}` started (EC2), but Minecraft did not respond in time. "
-                    "It may still be starting.",
-                    discord.Color.orange(),
-                ),
-            )
+            # Check if server was stopped during startup - don't show misleading message
+            try:
+                current_state = await self.ec2.get_state(server)
+            except AWSError:
+                current_state = "unknown"
+
+            if current_state == "running":
+                await self.say(
+                    channel,
+                    embed=self.embed(
+                        f"Server `{server_name}` started (EC2), but Minecraft did not respond in time. "
+                        "It may still be starting.",
+                        discord.Color.orange(),
+                    ),
+                )
 
     async def cmd_stop(
         self,
@@ -636,7 +643,7 @@ class MinecraftServerBot:
             await self._send_aws_error(channel, e)
             return
 
-        if ec2_state not in ("running", "pending"):
+        if ec2_state not in ("running", "pending", "stopping"):
             await self.say(
                 channel,
                 embed=self.embed(
