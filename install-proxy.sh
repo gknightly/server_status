@@ -48,6 +48,14 @@ if [[ ! -f "$PROXY_DIR/nftables-proxy.service" ]]; then
     error "Cannot find proxy/nftables-proxy.service. Run this script from the project directory."
 fi
 
+if [[ ! -f "$PROXY_DIR/docker-forward.sh" ]]; then
+    error "Cannot find proxy/docker-forward.sh. Run this script from the project directory."
+fi
+
+if [[ ! -f "$PROXY_DIR/docker-forward.conf" ]]; then
+    error "Cannot find proxy/docker-forward.conf. Run this script from the project directory."
+fi
+
 # Check dependencies
 info "Checking dependencies..."
 
@@ -72,9 +80,19 @@ info "Installing nftables-proxy.py..."
 cp "$PROXY_DIR/nftables-proxy.py" "$INSTALL_DIR/nftables-proxy.py"
 chmod 755 "$INSTALL_DIR/nftables-proxy.py"
 
+# Copy the Docker forwarding script
+info "Installing docker-forward.sh..."
+cp "$PROXY_DIR/docker-forward.sh" "$INSTALL_DIR/docker-forward.sh"
+chmod 755 "$INSTALL_DIR/docker-forward.sh"
+
 # Install systemd service
 info "Installing systemd service..."
 cp "$PROXY_DIR/nftables-proxy.service" /etc/systemd/system/nftables-proxy.service
+
+# Install Docker service drop-in for DOCKER-USER chain configuration
+info "Installing Docker service drop-in..."
+mkdir -p /etc/systemd/system/docker.service.d
+cp "$PROXY_DIR/docker-forward.conf" /etc/systemd/system/docker.service.d/forward.conf
 
 # Reload systemd
 info "Reloading systemd..."
@@ -112,24 +130,14 @@ else
 fi
 
 # Configure DOCKER-USER chain for forwarding (required when Docker is present)
-# Docker's FORWARD chain has policy DROP, so we need explicit rules to allow
-# proxied traffic through.
+# This will also run automatically on Docker restart via the drop-in
 info "Configuring firewall rules for traffic forwarding..."
 if nft list chain ip filter DOCKER-USER &>/dev/null; then
-    info "Configuring DOCKER-USER chain for proxy forwarding..."
-    nft flush chain ip filter DOCKER-USER
-    # Accept return traffic for established connections (required for responses from backend)
-    nft add rule ip filter DOCKER-USER ct state established,related counter accept
-    # Accept new Minecraft connections being forwarded to backend
-    nft add rule ip filter DOCKER-USER tcp dport 25565 counter accept
-    # Accept voice chat traffic (Simple Voice Chat mod)
-    nft add rule ip filter DOCKER-USER udp dport 24454 counter accept
-    # Return for everything else (continues through Docker's FORWARD chain)
-    nft add rule ip filter DOCKER-USER counter return
+    "$INSTALL_DIR/docker-forward.sh"
     info "DOCKER-USER chain configured"
 else
     warn "DOCKER-USER chain not found (Docker may not be running)."
-    warn "Run this script again after starting Docker, or manually configure forwarding."
+    warn "The rules will be applied automatically when Docker starts."
 fi
 
 # Print summary
